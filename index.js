@@ -8,12 +8,11 @@ require('dotenv').config();
 
 const app = express()
 
-app.use('/user', userRoutes)
-app.use('/course', courseRouter)
-app.use('/admin', adminRouter)
+app.use(express.json())
 
-
-
+app.use('/api/v1/user', userRoutes)
+app.use('/api/v1/course', courseRouter)
+app.use('/api/v1/admin', adminRouter)
 
 
 async function main() {
