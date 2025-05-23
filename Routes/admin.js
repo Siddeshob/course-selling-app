@@ -1,9 +1,10 @@
-const {Router}= require('express')
-const adminRouter=Router()
-const {adminModel} =require('../DB/db')
+const { Router } = require('express')
+const adminRouter = Router()
+const { adminModel, courseModel } = require('../DB/db')
 const z = require('zod');
 const bcrypt = require('bcrypt');
-const jwt = require('jsonwebtoken')
+const jwt = require('jsonwebtoken');
+const { adminMiddleware } = require('../middleware/admin');
 
 // Correct schema
 const signupSchema = z.object({
@@ -63,10 +64,10 @@ adminRouter.post('/signin', async (req, res) => {
                 id: admin._id
             }, process.env.JWT_ADMIN_PASSWORD)
 
-            
+
 
             console.log(`:: my token is : ${myToken}`)
-            
+
             return res.json({ msg: 'Signin successful', token: myToken })
         }
         else {
@@ -80,24 +81,74 @@ adminRouter.post('/signin', async (req, res) => {
 
 })
 
-adminRouter.post('/cources', (req,res)=>{
+adminRouter.post('/coures', adminMiddleware, async (req, res) => {
+    const adminId = req.adminId
+    console.log(`......adminId : ${adminId}`)
+    const { title, description, price, imageURL, createrId } = req.body
+
+    const course = await courseModel.create({
+        title: title,
+        description: description,
+        price: price,
+        imageURL: imageURL,
+        createrId: adminId
+    })
+    console.log(course)
     res.json({
-        msg:"cources createde................"
+        msg: "course is created.....",
+        courseId: course._id
     })
 })
+adminRouter.put('/coures', adminMiddleware, async (req, res) => {
+    try {
+        const adminId = req.adminId;
+        const { _id, title, description, price, imageURL } = req.body;
 
-adminRouter.put('/cources', (req,res)=>{
-    res.json({
-        msg:"cources updated................"
-    })
-})
+        const result = await courseModel.updateOne(
+            {
+                _id: _id,
+                createrId: adminId,  // ✅ Only update if admin owns the course
+            },
+            {
+                title,
+                description,
+                price,
+                imageURL,
+            }
+        );
 
-adminRouter.get('/cources/bulk', (req,res)=>{
-    res.json({
-        msg:"cources createde................"
-    })
-})
+        if (result.matchedCount === 0) {
+            return res.status(404).json({ msg: "Course not found or not authorized." });
+        }
 
-module.exports={
-    adminRouter:adminRouter
+        res.json({ msg: "Course updated successfully." });
+    } catch (e) {
+        console.log("Error updating course:", e);
+        res.status(500).json({ msg: "Internal server error" });
+    }
+});
+
+
+adminRouter.get('/coures/bulk', adminMiddleware, async (req, res) => {
+    try {
+        const adminId = req.adminId;
+        console.log("**************Admin ID from middleware:", req.adminId);
+
+        const courses = await courseModel.find({
+            createrId: adminId
+        });
+
+        res.json({
+            msg: "Courses fetched successfully",
+            courses
+        });
+    } catch (err) {
+        console.error("Error fetching courses:", err);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
+
+
+module.exports = {
+    adminRouter: adminRouter
 }
